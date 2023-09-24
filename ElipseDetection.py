@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 # Read the original image
-img = cv2.imread('Test Images/test2.JPG')
+img = cv2.imread('Test Images/ImageTest.jpg')
 
 # Blur the image for better edge detection
 img_blur = cv2.GaussianBlur(img.copy(), (5, 5), 0)
@@ -69,7 +69,7 @@ for contour in contours:
 
     # len is a function in python that means length.
     # It returns the number of vertices in the contour.
-    if cv2.contourArea(contour) > (img_blur.shape[0] / 100.0 * img_blur.shape[1] / 100.0): #and cv2.contourArea(contour) < 20: 4 <= len(approx) <= 6:
+    if (img_blur.shape[0] / 10.0 * img_blur.shape[1] / 10.0) > cv2.contourArea(contour) > (img_blur.shape[0] / 100.0 * img_blur.shape[1] / 100.0): #and cv2.contourArea(contour) < 20: 4 <= len(approx) <= 6:
         (x, y), (a, b), ang = cv2.fitEllipse(contour)
         area = a * b * np.pi / 4
         if area < cv2.contourArea(approx) * 1.1:
