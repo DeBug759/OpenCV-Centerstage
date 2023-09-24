@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 # Read the original image
-img = cv2.imread('Test Images/MultiColor.jpg')
+img = cv2.imread('Test Images/test2.JPG')
 
 # Blur the image for better edge detection
 img_blur = cv2.GaussianBlur(img.copy(), (5, 5), 0)
@@ -53,8 +53,6 @@ centers = []
 # Distance threshold for merging centers
 distance_threshold = 10
 
-count = 0
-
 # Iterate over the contours and find those with approximately 6 vertices (hexagons)
 for contour in contours:
     # Epsilon defines the accuracy of the approximation.
@@ -69,13 +67,12 @@ for contour in contours:
     # Approx returns a list of points (x, y) in each element.
     approx = cv2.approxPolyDP(contour, epsilon, True)
 
-
     # len is a function in python that means length.
     # It returns the number of vertices in the contour.
-    if cv2.contourArea(contour) > 10: #and cv2.contourArea(contour) < 20: 4 <= len(approx) <= 6:
-        (x, y), rad = cv2.minEnclosingCircle(contour)
-        area = rad**2 * np.pi
-        if area < cv2.contourArea(approx) * 1.4:
+    if cv2.contourArea(contour) > (img_blur.shape[0] / 100.0 * img_blur.shape[1] / 100.0): #and cv2.contourArea(contour) < 20: 4 <= len(approx) <= 6:
+        (x, y), (a, b), ang = cv2.fitEllipse(contour)
+        area = a * b * np.pi / 4
+        if area < cv2.contourArea(approx) * 1.1:
 
             merge = False
             for center in centers:
@@ -87,10 +84,8 @@ for contour in contours:
             # If it's not close to an existing center, add it to the list and draw the dot
             if not merge:
                 centers.append((x, y))
-                count+=1
                 cv2.circle(img_dots, (int(x), int(y)), 3, dot_color, -1)  # -1 fills the circle
                 cv2.drawContours(img_dots, [approx], 0, (0, 255, 0), 2)
-
 
         # for point in approx:
         #     all_x.append(point[0][0])
@@ -134,7 +129,7 @@ for contour in contours:
 cv2.imshow('Edges', edges)
 cv2.imshow('res', res)
 cv2.imshow('Image with Dots', img_dots)
-print(count)
+
 print(centers)
 
 cv2.waitKey(0)
