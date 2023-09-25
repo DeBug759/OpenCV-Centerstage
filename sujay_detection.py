@@ -2,7 +2,9 @@ import cv2
 import numpy as np
 
 
-# this is to force rescale the image to display on my computer
+# MOST ERRORS CAN BE GOTTEN RID OF VIA SIZE THRESHOLDING USING DISTANCE
+
+# this is to force rescale the image to lower res
 def rescale(frame):
     scale_fac = max(frame.shape[0], frame.shape[1]) / 500.0
     if scale_fac > 1:
@@ -10,13 +12,8 @@ def rescale(frame):
     return frame
 
 
-# this is to display an image on to my computer
-def display(name, frame):
-    cv2.imshow(name, rescale(frame))
-
-
 # Read the original image
-img = cv2.imread('Test Images/test2.JPG')
+img = cv2.imread('Test Images/MultiColor.jpg')
 img = rescale(img)
 
 # Create a copy of the original image to draw on
@@ -27,56 +24,78 @@ def find_detections(image):
     # Canny Edge Detection
     edges = cv2.Canny(image=image, threshold1=100, threshold2=210)  # Canny Edge Detection
     edges = cv2.GaussianBlur(edges, (5, 5), 0)
-    # edges = cv2.bitwise_not(image)
+
     # Find contours in the edge-detected image
-    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
     # List to store detected pixels
     detections = []
 
     # Distance threshold for merging centers
     distance_threshold = 10
-    # Iterate over the contours and find those with approximately 6 vertices (hexagons)
+
+    # mask to store donuts use to verify donut shape
+    mask = np.zeros_like(image)
+    inside = 0.4
+    outside = 0.9
+
+    # Iterate over the contours and find insides of the pixels
     for contour in contours:
 
         # len is a function in python that means length.
         # It returns the number of vertices in the contour.
-        if (image.shape[0] / 10.0 * image.shape[1] / 10.0) > cv2.contourArea(contour) > (
-                image.shape[0] / 100.0 * image.shape[1] / 100.0):  # and cv2.contourArea(contour) < 20: 4 <= len(
+        if True:  # TODO: eventually add size thresholding based on distance
             # approx) <= 6:
             (x, y), (a, b), ang = cv2.minAreaRect(contour)
 
-            mask = np.zeros_like(image)
-            cv2.ellipse(mask, (int(x), int(y)), (int(a), int(b)), ang, 0.0, 360.0, (1, 1, 1), -1)
-            cv2.ellipse(mask, (int(x), int(y)), (int(0.4 * a), int(0.4 * b)), ang, 0.0, 360.0, (0, 0, 0), -1)
-
-            mean = np.sum(np.multiply(image / 255.0, mask)) / np.sum(mask)
-
+            # ellipse area
             area = a * b * np.pi / 4
-            if area < cv2.contourArea(contour) * 1.05 and mean > 0.75:
-                merge = False
-                for det in detections:
-                    (det_x, det_y), _ = det
-                    # Line below uses the distance formula to check if it is within the distance threshold.
-                    if np.sqrt((x - det_x) ** 2 + (y - det_y) ** 2) <= distance_threshold:
-                        merge = True
-                        break
+            if 1 > area / cv2.contourArea(contour):
 
-                # If it's not close to an existing center, add it to the list and draw the dot
-                if not merge:
-                    detections.append(((x, y), area))
-                    cv2.drawContours(edges, [contour], -1, (255, 0, 0), 1)
-                    cv2.ellipse(edges, (int(x), int(y)), (int(a), int(b)), ang, 0.0, 360.0, (255, 0, 0), 1)
-    display("EDGES", edges)
-    display("IMAGE", image)
+                # writes the donut shape onto the mask
+                cv2.ellipse(mask, (int(x), int(y)), (int(outside * a), int(outside * b)), ang, 0.0, 360.0, (1, 1, 1),
+                            -1)
+                cv2.ellipse(mask, (int(x), int(y)), (int(inside * a), int(inside * b)), ang, 0.0, 360.0, (0, 0, 0), -1)
+
+                active_count = np.sum(mask)
+                outer_mean = 0
+                if active_count > 0:
+                    # BITWISE_AND PER IMAGE IS PRETTY INEFFICIENT, COULD SLOW DOWN BOT
+                    # this line finds the mean of the values that are inside the donut written on the mask
+                    outer_mean = np.sum(cv2.bitwise_and(image, mask)) / active_count
+
+                # reset the mask for future use
+                cv2.ellipse(mask, (int(x), int(y)), (int(0.9 * a), int(0.9 * b)), ang, 0.0, 360, (0, 0, 0), -1)
+
+                if outer_mean > 0.9:
+                    merge = False
+                    for det in detections:
+                        (det_x, det_y), _, _ = det
+                        # Line below uses the distance formula to check if it is within the distance threshold.
+                        if np.sqrt((x - det_x) ** 2 + (y - det_y) ** 2) <= distance_threshold:
+                            merge = True
+                            break
+
+                    # If it's not close to an existing center, add it to the list and draw the dot
+                    if not merge:
+                        detections.append(((x, y), (a, b), ang))
+                        # cv2.drawContours(edges, [contour], -1, (255, 0, 0), 1)
+                        cv2.ellipse(edges, (int(x), int(y)), (int(inside * a), int(inside * b)), ang, 0.0, 360.0,
+                                    (255, 0, 0), 1)
+                        cv2.ellipse(edges, (int(x), int(y)), (int(outside * a), int(outside * b)), ang, 0.0, 360.0,
+                                    (255, 0, 0), 1)
+
+    cv2.imshow("EDGES", edges)
+    cv2.imshow("IMAGE", image)
     cv2.waitKey()
+    cv2.destroyAllWindows()
     return detections
 
 
 # Blur the image for better edge detection
 img_blur = cv2.GaussianBlur(img, (5, 5), 0)
 
-# HSV conversion
+# color space conversions
 hsv = cv2.cvtColor(img_blur, cv2.COLOR_BGR2HSV)
 gray = cv2.cvtColor(img_blur, cv2.COLOR_BGR2GRAY)
 
@@ -104,37 +123,37 @@ purple_dot = (128, 0, 128)
 # white
 w_lower = np.array([0, 0, 140])
 w_higher = np.array([179, 24, 255])
+# use mean of the image as a baseline for the white mask
+# this mean is just temporary, eventually we should find backboard via april tags and sample lighting via that?
 mean = np.sum(gray) / (gray.shape[0] * gray.shape[1]) * 1.5
 _, white_mask = cv2.threshold(gray, mean, 255, cv2.THRESH_BINARY)
+# these lines ensure that none of the other masks are on the white mask
 white_mask = cv2.bitwise_and(white_mask, cv2.bitwise_not(green_mask))
 white_mask = cv2.bitwise_and(white_mask, cv2.bitwise_not(yellow_mask))
 white_mask = cv2.bitwise_and(white_mask, cv2.bitwise_not(purple_mask))
 white_detections = find_detections(white_mask)
 white_dot = (255, 255, 255)
 
-# Set the thickness to draw everything at
-thickness = int(np.ceil(img.shape[0] / 200.0))
-print(thickness)
+
+def draw_detection(detection, color):
+    (x, y), (a, b), ang = detection
+    cv2.circle(img_dots, (int(x), int(y)), 2, color, -1)
+
 
 for detection in yellow_detections:
-    (x, y), _ = detection
-    cv2.circle(img_dots, (int(x), int(y)), thickness, yellow_dot, -1)
+    draw_detection(detection, yellow_dot)
 
 for detection in green_detections:
-    (x, y), _ = detection
-    cv2.circle(img_dots, (int(x), int(y)), thickness, green_dot, -1)
+    draw_detection(detection, green_dot)
 
 for detection in purple_detections:
-    (x, y), _ = detection
-    cv2.circle(img_dots, (int(x), int(y)), thickness, purple_dot, -1)
+    draw_detection(detection, purple_dot)
 
 for detection in white_detections:
-    (x, y), _ = detection
-    cv2.circle(img_dots, (int(x), int(y)), thickness, white_dot, -1)
+    draw_detection(detection, white_dot)
 
 # Display the image with dots
-display('White Mask', white_mask)
-display('Image with Dots', img_dots)
+cv2.imshow('Image with Dots', img_dots)
 
 cv2.waitKey(0)
 cv2.destroyAllWindows()
