@@ -13,7 +13,7 @@ def rescale(frame):
 
 
 # Read the original image
-img = cv2.imread('Test Images/ImageTest.jpg')
+img = cv2.imread('Test Images/FloorMix.jpg')
 img = rescale(img)
 
 # Create a copy of the original image to draw on
@@ -24,7 +24,7 @@ def find_detections(image):
     # Canny Edge Detection
     edges = cv2.Canny(image=image, threshold1=100, threshold2=210)  # Canny Edge Detection
     edges = cv2.GaussianBlur(edges, (5, 5), 0)
-    _, edges = cv2.threshold(edges, 70, 255, cv2.THRESH_BINARY)
+    _, edges = cv2.threshold(edges, 50, 255, cv2.THRESH_BINARY)
 
     # Find contours in the edge-detected image
     contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -35,8 +35,10 @@ def find_detections(image):
     # Distance threshold for merging centers
     distance_threshold = 10
 
-    # mask to store donuts use to verify donut shape
-    mask = np.zeros_like(image)
+    # Mean threshold
+    mean_threshold = 0.8
+
+    # Mask to store donuts use to verify donut shape
     inside = 0.5
     outside = 1
 
@@ -53,24 +55,21 @@ def find_detections(image):
 
             # ellipse area
             area = a * b * np.pi * inside * inside
-            if 1.2 * cv2.contourArea(contour) > area:
-
+            if 1.5 * cv2.contourArea(contour) > area and cy - b >= 0 and cx - a >= 0 and cy + b < image.shape[0] and cx + a < image.shape[1]:
+                small_image = image[int(cy - b):int(cy + b), int(cx - a):int(cx + a)]
+                mask = np.zeros_like(small_image)
                 # writes the donut shape onto the mask
-                cv2.ellipse(mask, (int(cx), int(cy)), (int(outside * a), int(outside * b)), 0, 0.0, 360.0, (1, 1, 1),
-                            -1)
-                cv2.ellipse(mask, (int(cx), int(cy)), (int(inside * a), int(inside * b)), 0, 0.0, 360.0, (0, 0, 0), -1)
+                cv2.ellipse(mask, (int(a), int(b)), (int(outside * a), int(outside * b)), 0, 0.0, 360.0, (1, 1, 1), -1)
+                cv2.ellipse(mask, (int(a), int(b)), (int(inside * a), int(inside * b)), 0, 0.0, 360.0, (0, 0, 0), -1)
 
                 active_count = np.sum(mask)
                 outer_mean = 0
                 if active_count > 0:
                     # BITWISE_AND PER IMAGE IS PRETTY INEFFICIENT, COULD SLOW DOWN BOT
                     # this line finds the mean of the values that are inside the donut written on the mask
-                    outer_mean = np.sum(cv2.bitwise_and(image, mask)) / active_count
+                    outer_mean = np.sum(cv2.bitwise_and(small_image, mask)) / active_count
 
-                # reset the mask for future use
-                cv2.ellipse(mask, (int(cx), int(cy)), (int(outside * a), int(outside * b)), 0, 0.0, 360, (0, 0, 0), -1)
-
-                if outer_mean > 0.5:
+                if outer_mean > mean_threshold:
                     merge = False
                     for det in detections:
                         (det_x, det_y), _ = det
