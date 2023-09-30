@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 # Load the image
-image = cv2.imread("SpikeImages/RedCenter.jpg")
+image = cv2.imread("SpikeImages/RedRight.jpg")
 
 # Get the image dimensions
 height, width, _ = image.shape
