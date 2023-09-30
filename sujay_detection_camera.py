@@ -82,7 +82,7 @@ def find_detections(image):
     return detections
 
 
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 if not cap.isOpened():
     print("Cannot open camera")
     exit()
@@ -147,6 +147,7 @@ while True:
     def draw_detection(detection, color):
         (x, y), (a, b) = detection
         cv2.circle(image, (int(x), int(y)), 2, color, -1)
+        cv2.ellipse(image, (int(x), int(y)), (int(a), int(b)), 0, 0.0, 360.0, color, 1)
 
 
     for detection in yellow_detections:
