@@ -6,16 +6,18 @@ def callback(x):
     pass
 
 
-frame = cv2.imread("Test Images/test2.JPG")
+frame = cv2.imread("SpikeImages/RedCenter.jpg")
 cv2.namedWindow('image')
 
+#Blue: lowH : 50, highH: 179, lowS: 116, highS: 255, lowV: 0, highV: 146
+#Red: lowH : 0, highH: 179, lowS: 127, highS: 255, lowV: 93, highV: 168
 ilowH = 0
 ihighH = 179
 
-ilowS = 0
+ilowS = 127
 ihighS = 255
-ilowV = 0
-ihighV = 255
+ilowV = 93
+ihighV = 168
 
 # create trackbars for color change
 cv2.createTrackbar('lowH', 'image', ilowH, 179, callback)
